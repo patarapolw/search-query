@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "outDir": "./dist/",
+        "sourceMap": true,
+        "strict": true,
+        "noImplicitReturns": true,
+        "noImplicitAny": true,
+        "module": "es6",
+        "moduleResolution": "node",
+        "target": "es5",
+        "lib": ["es2017", "dom"],
+        "allowSyntheticDefaultImports": true,
+        "typeRoots": ["./node_modules/@types", "./src/@types"],
+        "downlevelIteration": true,
+        "resolveJsonModule": true,
+        "declaration": true
+    },
+    "include": [
+        "./src/**/*"
+    ]
+}
