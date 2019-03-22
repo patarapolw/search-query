@@ -24,12 +24,8 @@ export class MongoSearchQuery {
             ).map((el) => {
                 return {$or: [el[0], el[2]]};
             }),
-            AndSentence: (r) => P.seq(
-                r.Sentence,
-                P.string(" "),
-                r.Sentence
-            ).map((el) => {
-                return {$and: [el[0], el[2]]};
+            AndSentence: (r) => r.Sentence.sepBy1(P.string(" ")).map((el) => {
+                return el.length > 1 ? {$or: el} : el[0];
             }),
             Sentence: (r) => P.alt(
                 r.Bracketed,
@@ -45,12 +41,8 @@ export class MongoSearchQuery {
             ).map((el) => {
                 return {$or: [el[0], el[2]]};
             }),
-            AndExpr: (r) => P.seq(
-                r.Expr,
-                P.string(" "),
-                r.Expr
-            ).map((el) => {
-                return {$and: [el[0], el[2]]};
+            AndExpr: (r) => r.Expr.sepBy1(P.string(" ")).map((el) => {
+                return el.length > 1 ? {$or: el} : el[0];
             }),
             Expr: (r) => P.alt(
                 r.FullExpr,
@@ -62,18 +54,26 @@ export class MongoSearchQuery {
                 if (rule.any) {
                     for (const col of rule.any) {
                         if (rule.isString) {
-                            if (rule.isString.indexOf(col) !== -1) {
+                            if (rule.isString.indexOf(col) !== -1 && typeof el !== "object") {
                                 expr.push({[col]: {$regex: XRegExp.escape(el.toString())}});
                             } else {
                                 expr.push({[col]: el});
                             }
                         } else {
-                            expr.push({[col]: {$regex: XRegExp.escape(el.toString())}});
+                            if (typeof el !== "object") {
+                                expr.push({[col]: {$regex: XRegExp.escape(el.toString())}});
+                            } else {
+                                expr.push({[col]: el});
+                            }
                         }
                     }
                 } else if (rule.isString) {
                     for (const col of rule.isString) {
-                        expr.push({[col]: {$regex: XRegExp.escape(el.toString())}});
+                        if (typeof el !== "object") {
+                            expr.push({[col]: {$regex: XRegExp.escape(el.toString())}});
+                        } else {
+                            expr.push({[col]: el});
+                        }
                     }
                 }
 
@@ -90,48 +90,42 @@ export class MongoSearchQuery {
             ).map((el: any[]) => {
                 const result = {[el[0]]: el[2]};
 
-                if (rule.isDate && rule.isDate.indexOf(el[0]) !== -1) {
-                    result[el[0]] = {$toDate: el[2]};
-                }
-
-                switch (el[1]) {
-                    case ":":
-                        if (rule.isString) {
-                            if (rule.isString.indexOf(el[0]) !== -1) {
-                                result[el[0]] = {$regex: XRegExp.escape(el[2].toString())};
-                            }
-                        } else {
+                if (rule.isDate && rule.isDate.indexOf(el[0]) !== -1 && typeof el[2] !== "object") {
+                    result[el[0]] = {$toDate: el[2].toString()};
+                } else if (el[1] === ":" && typeof el[2] !== "object") {
+                    if (rule.isString) {
+                        if (rule.isString.indexOf(el[0]) !== -1) {
                             result[el[0]] = {$regex: XRegExp.escape(el[2].toString())};
                         }
-                        break;
-                    case ">=":
-                        result[el[0]] = {$gte: el[2]};
-                        break;
-                    case ">":
-                        result[el[0]] = {$gt: el[2]};
-                        break;
-                    case "<=":
-                        result[el[0]] = {$lte: el[2]};
-                        break;
-                    case "<":
-                        result[el[0]] = {$lt: el[2]};
-                        break;
-                    case "=":
-                    default:
+                    } else {
+                        result[el[0]] = {$regex: XRegExp.escape(el[2].toString())};
+                    }
+                } else if (el[1] === ">=") {
+                    result[el[0]] = {$gte: el[2]};
+                } else if (el[1] === ">") {
+                    result[el[0]] = {$gt: el[2]};
+                } else if (el[1] === "<=") {
+                    result[el[0]] = {$lte: el[2]};
+                } else if (el[1] === "<") {
+                    result[el[0]] = {$lt: el[2]};
                 }
 
                 return result;
             }),
             Value: (r) => P.alt(
                 r.Number,
-                r.String
+                r.String,
+                r.Not
             ),
             Number: () => P.regexp(/\d+(?:\.\d+)?/).map(Number),
             String: (r) => P.alt(
                 r.RawString,
                 r.QuoteString
             ),
-            RawString: () => P.regexp(/[^" :>=<]+/),
+            Not: (r) => P.string("-").then(r.String).map((el) => {
+                return {$not: el};
+            }),
+            RawString: () => P.regexp(/(?!-)[^" :>=<]+/),
             QuoteString: (r) => r.Quote.then(r.Value).skip(r.Quote),
             Quote: () => P.string('"'),
             Op: () => P.alt(
@@ -152,12 +146,3 @@ export class MongoSearchQuery {
 }
 
 export default MongoSearchQuery;
-
-// const sq = new MongoSearchQuery({
-//     any: ["x", "y", "z"]
-// });
-
-// console.log(inspect(sq.search(`a`), false, null, true));
-// console.log(inspect(sq.search(`1`), false, null, true));
-// console.log(inspect(sq.search(`"a":1 b`), false, null, true));
-// console.log(inspect(sq.search(`(a OR b>2) OR c=a`), false, null, true));
