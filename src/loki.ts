@@ -1,18 +1,17 @@
 import P from "parsimmon";
 import XRegExp from "xregexp";
 import moment from "moment";
-import { ObjectID } from "bson";
 
-export interface IMongoSearchQueryRule {
-    anyOf?: string[];
+export interface ILokiSearchQueryRule {
+    any?: string[];
     isString?: string[];
     isDate?: string[];
 }
 
-export class MongoSearchParser {
+export class LokiSearchQuery {
     private lang: P.Language;
 
-    constructor(rule: IMongoSearchQueryRule = {}) {
+    constructor(rule: ILokiSearchQueryRule = {}) {
         this.lang = P.createLanguage({
             Input: (r) => P.alt(
                 r.OrSentence,
@@ -61,8 +60,8 @@ export class MongoSearchParser {
             PartialExpr: (r) => r.Value.map((el) => {
                 const expr = [] as any[];
 
-                if (rule.anyOf) {
-                    for (const col of rule.anyOf) {
+                if (rule.any) {
+                    for (const col of rule.any) {
                         if (rule.isString) {
                             if (rule.isString.indexOf(col) !== -1) {
                                 expr.push({[col]: {$regex: XRegExp.escape(el.toString())}});
@@ -95,10 +94,6 @@ export class MongoSearchParser {
 
                 const result = {} as any;
 
-                if (k === "id") {
-                    return {_id: new ObjectID(v)};
-                }
-
                 if (v === "NULL") {
                     return {$or: [
                         {[k]: ""},
@@ -110,10 +105,10 @@ export class MongoSearchParser {
                     const m = /^([-+]?\d+)(\S+)$/.exec(v.toString());
 
                     if (m) {
-                        v = moment().add(moment.duration(parseInt(m[1]), m[2] as any)).toDate();
+                        v = moment().add(moment.duration(parseInt(m[1]), m[2] as any)).toISOString();
                         op = "<=";
-                    } else if (v === "NOW") {
-                        v = new Date();
+                    } else if (v === "now") {
+                        v = moment().toISOString();
                         op = "<=";
                     }
                 }
@@ -132,16 +127,28 @@ export class MongoSearchParser {
                         v = {$regex: v.toString()};
                         break;
                     case ">=":
-                        v = {$gte: v};
+                        v = {$and: [
+                            {$gte: v},
+                            {$exists: true}
+                        ]};
                         break;
                     case ">":
-                        v = {$gt: v};
+                        v = {$and: [
+                            {$gt: v},
+                            {$exists: true}
+                        ]};
                         break;
                     case "<=":
-                        v = {$lte: v};
+                        v = {$and: [
+                            {$lte: v},
+                            {$exists: true}
+                        ]};
                         break;
                     case "<":
-                        v = {$lt: v};
+                        v = {$and: [
+                            {$lt: v},
+                            {$exists: true}
+                        ]};
                         break;
                     case "=":
                     default:
@@ -181,4 +188,4 @@ export class MongoSearchParser {
     }
 }
 
-export default MongoSearchParser;
+export default LokiSearchQuery;

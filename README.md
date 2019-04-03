@@ -6,7 +6,10 @@ Convert one line search query to machine-readable query, preferably on client-si
 
 - Install [parsimmon](https://github.com/jneen/parsimmon)
 - Install [XRegExp](https://www.npmjs.com/package/xregexp)
-- Copy the code from [/src/mongo.ts](/src/mongo.ts)
+- Copy the code
+     - MongoDB - [/src/mongo.ts](/src/mongo.ts)
+     - LokiJS  - [/src/loki.ts](/src/loki.ts)
+     - SQLite  - [/src/sqlite.ts](/src/sqlite.ts)
 
 ## Example
 
